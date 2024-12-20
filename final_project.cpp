@@ -1,86 +1,99 @@
-#include <iostream>
-#include <filesystem>
-#include <fstream>
-#include <string>
+#include <iostream> // Підключення бібліотеки для вводу/виводу
+#include <fstream> // Підключення бібліотеки для роботи з файлами
+#include <vector> // Підключення бібліотеки для використання векторів
+#include <string> // Підключення бібліотеки для роботи з рядками
+#include <ctime> // Підключення бібліотеки для роботи з часом
+#include <cstdlib> // Підключення бібліотеки для генерації випадкових чисел
+#include <algorithm> // Підключення бібліотеки для використання алгоритмів STL
 
-namespace fs = std::filesystem;
+class Hangman {
+private:
+    std::vector<std::string> words; // Вектор для зберігання слів
+    std::string currentWord; // Змінна для зберігання поточного слова
+    std::string guessedWord; // Змінна для зберігання вгаданого слова
+    std::vector<char> guessedLetters; // Вектор для зберігання вгаданих літер
+    int attempts; // Кількість спроб
+    time_t startTime; // Час початку гри
 
-class FileManager {
+    void loadWords(const std::string& filename) {
+        std::ifstream file(filename); // Відкриття файлу для читання
+        std::string word;
+        while (file >> word) { // Читання слів з файлу
+            words.push_back(word); // Додавання слова до вектора
+        }
+    }
+
+    void chooseWord() {
+        if (words.empty()) { // Перевірка, чи завантажені слова
+            std::cerr << "Error: No words loaded from file." << std::endl; // Виведення помилки, якщо слова не завантажені
+            exit(1); // Завершення програми з кодом помилки
+        }
+        srand(static_cast<unsigned int>(time(0))); // Ініціалізація генератора випадкових чисел
+        currentWord = words[rand() % words.size()]; // Вибір випадкового слова з вектора
+        guessedWord = std::string(currentWord.size(), '_'); // Ініціалізація вгаданого слова підкресленнями
+    }
+
+    void displayStatus() {
+        std::cout << "Word: " << guessedWord << std::endl; // Виведення вгаданого слова
+        std::cout << "Attempts left: " << attempts << std::endl; // Виведення кількості залишених спроб
+        std::cout << "Guessed letters: "; // Виведення вгаданих літер
+        for (char c : guessedLetters) {
+            std::cout << c << ' '; // Виведення кожної вгаданої літери
+        }
+        std::cout << std::endl;
+    }
+
+    bool isWordGuessed() {
+        return guessedWord == currentWord; // Перевірка, чи вгадане слово повністю
+    }
+
 public:
-    void showContents(const std::string& path) {
-        for (const auto& entry : fs::directory_iterator(path)) {
-            std::cout << entry.path() << std::endl;
-        }
+    Hangman(const std::string& filename) : attempts(6) { // Конструктор класу, ініціалізація кількості спроб
+        loadWords(filename); // Завантаження слів з файлу
+        chooseWord(); // Вибір випадкового слова
+        startTime = time(0); // Збереження часу початку гри
     }
 
-    void createFile(const std::string& path) {
-        std::ofstream file(path);
-        if (file) {
-            std::cout << "File created: " << path << std::endl;
-        } else {
-            std::cerr << "Failed to create file: " << path << std::endl;
-        }
-    }
+    void play() {
+        while (attempts > 0 && !isWordGuessed()) { // Цикл гри, поки є спроби і слово не вгадане
+            displayStatus(); // Виведення статусу гри
+            char guess;
+            std::cout << "Enter a letter: "; // Запит на введення літери
+            std::cin >> guess; // Введення літери
+            guessedLetters.push_back(guess); // Додавання літери до вектора вгаданих літер
 
-    void createDirectory(const std::string& path) {
-        if (fs::create_directory(path)) {
-            std::cout << "Directory created: " << path << std::endl;
-        } else {
-            std::cerr << "Failed to create directory: " << path << std::endl;
-        }
-    }
-
-    void deleteFileOrDirectory(const std::string& path) {
-        if (fs::remove_all(path)) {
-            std::cout << "Deleted: " << path << std::endl;
-        } else {
-            std::cerr << "Failed to delete: " << path << std::endl;
-        }
-    }
-
-    void renameFileOrDirectory(const std::string& oldPath, const std::string& newPath) {
-        fs::rename(oldPath, newPath);
-        std::cout << "Renamed: " << oldPath << " to " << newPath << std::endl;
-    }
-
-    void copyFileOrDirectory(const std::string& source, const std::string& destination) {
-        fs::copy(source, destination, fs::copy_options::recursive);
-        std::cout << "Copied: " << source << " to " << destination << std::endl;
-    }
-
-    uintmax_t calculateSize(const std::string& path) {
-        if (fs::is_directory(path)) {
-            uintmax_t size = 0;
-            for (const auto& entry : fs::recursive_directory_iterator(path)) {
-                if (fs::is_regular_file(entry.path())) {
-                    size += fs::file_size(entry.path());
+            if (currentWord.find(guess) != std::string::npos) { // Перевірка, чи є літера в слові
+                for (size_t i = 0; i < currentWord.size(); ++i) {
+                    if (currentWord[i] == guess) { // Якщо літера є в слові, замінити підкреслення на літеру
+                        guessedWord[i] = guess;
+                    }
                 }
+            } else {
+                --attempts; // Якщо літери немає в слові, зменшити кількість спроб
             }
-            return size;
-        } else if (fs::is_regular_file(path)) {
-            return fs::file_size(path);
         }
-        return 0;
-    }
 
-    void searchByMask(const std::string& path, const std::string& mask) {
-        for (const auto& entry : fs::recursive_directory_iterator(path)) {
-            if (entry.path().filename().string().find(mask) != std::string::npos) {
-                std::cout << entry.path() << std::endl;
-            }
+        time_t endTime = time(0); // Збереження часу закінчення гри
+        double duration = difftime(endTime, startTime); // Обчислення тривалості гри
+
+        if (isWordGuessed()) {
+            std::cout << "Congratulations! You guessed the word: " << currentWord << std::endl; // Виведення повідомлення про виграш
+        } else {
+            std::cout << "Game over! The word was: " << currentWord << std::endl; // Виведення повідомлення про програш
         }
+
+        std::cout << "Time taken: " << duration << " seconds" << std::endl; // Виведення тривалості гри
+        std::cout << "Attempts: " << 6 - attempts << std::endl; // Виведення кількості використаних спроб
+        std::cout << "Guessed letters: "; // Виведення вгаданих літер
+        for (char c : guessedLetters) {
+            std::cout << c << ' '; // Виведення кожної вгаданої літери
+        }
+        std::cout << std::endl;
     }
 };
 
 int main() {
-    FileManager fm;
-    fm.showContents(".");
-    fm.createFile("test.txt");
-    fm.createDirectory("test_dir");
-    fm.deleteFileOrDirectory("test.txt");
-    fm.renameFileOrDirectory("test_dir", "new_test_dir");
-    fm.copyFileOrDirectory("new_test_dir", "copy_test_dir");
-    std::cout << "Size: " << fm.calculateSize("copy_test_dir") << " bytes" << std::endl;
-    fm.searchByMask(".", "test");
-    return 0;
+    Hangman game("words.txt"); // Створення об'єкта гри з файлом слів
+    game.play(); // Запуск гри
+    return 0; // Завершення програми
 }
